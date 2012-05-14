@@ -71,6 +71,7 @@
     this.timer = null;
     this._options = {};
     this.uploads = [];
+    this.files = [];
     this.results = {};
     this.ended = null;
     this.pollStarted = null;
@@ -149,7 +150,7 @@
   };
 
   Uploader.prototype.start = function() {
-    var self = this;
+    var i, self = this;
 
     this.started = false;
     this.ended = false;
@@ -171,27 +172,60 @@
     this.$iframe = $('<iframe id="transloadit-'+this.assemblyId+'" name="transloadit-'+this.assemblyId+'"/>')
       .appendTo('body')
       .hide();
-
-    this.$uploadForm = $('<form enctype="multipart/form-data" />')
-      .attr('action', PROTOCOL+this.instance+'/assemblies/'+this.assemblyId+'?redirect=false')
-      .attr('target', 'transloadit-' + this.assemblyId)
-      .attr('method', 'POST')
-      .append(this.$files)
-      .appendTo('body')
-      .hide();
-
+    
     var fieldsFilter = '[name=params], [name=signature]';
     if (this._options.fields === true) {
       fieldsFilter = '*';
     } else if (typeof this._options.fields == 'string') {
       fieldsFilter += ', '+this._options.fields;
     }
+    
+    var form_action = PROTOCOL+this.instance+'/assemblies/'+this.assemblyId+'?redirect=false';
+    var form_target = 'transloadit-' + this.assemblyId;
+    var form_method = 'POST';
+    
+    if (this.files.length) {
+      var formData = new FormData();
+      
+      var $inputs = this.$form.find(':input[type!=file]').filter(fieldsFilter);
+      for (i = 0; i < $inputs.length; i++) {
+        var $input = $($inputs[i]);
+        var name = $input.attr('name') || '';
+        if (name.length) {
+          formData.append(name, $input.val());
+        }
+      }
+      
+      for (i = 0; i < this.files.length; i++) {
+        formData.append(this.files[i].name, this.files[i].file);
+      }
+      
+      var xhr = new XMLHttpRequest();
+      xhr.open(form_method, form_action, true);
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      if (formData.fake === true) {
+        xhr.setRequestHeader('Content-Type', 'multipart/form-data; boundary=' + formData.boundary);
+        xhr.sendAsBinary(formData.toString());
+      } else {
+        xhr.send(formData);
+      }
+      
+      this.files = [];
+    } else {
+      this.$uploadForm = $('<form enctype="multipart/form-data" />')
+        .attr('action', form_action)
+        .attr('target', form_target)
+        .attr('method', form_method)
+        .append(this.$files)
+        .appendTo('body')
+        .hide();
 
-    var $clones = this.clone(this.$form.find(':input[type!=file]').filter(fieldsFilter));
-    $clones.prependTo(this.$uploadForm);
+      var $clones = this.clone(this.$form.find(':input[type!=file]').filter(fieldsFilter));
+      $clones.prependTo(this.$uploadForm);
 
-    this.$uploadForm.submit();
-
+      this.$uploadForm.submit();
+    }
+    
     this.lastPoll = +new Date;
     setTimeout(function() {
       self._poll();
@@ -209,7 +243,14 @@
 
     return $result;
   };
-
+  
+  Uploader.prototype.addFile = function(name, file) {
+    this.files.push({
+      name: name,
+      file: file
+    });
+  };
+  
   Uploader.prototype.detectFileInputs = function() {
     var $files = this.$form
       .find('input[type=file]')
