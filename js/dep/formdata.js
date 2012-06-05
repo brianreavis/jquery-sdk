@@ -22,10 +22,12 @@
         this._fields.forEach(function(field) {
             body += "--" + boundary + "\r\n";
             // file upload
-            if (field[1].name) {
+			if (field[1].name || field[1].fileName) {
                 var file = field[1];
-                body += "Content-Disposition: form-data; name=\""+ field[0] +"\"; filename=\""+ file.name +"\"\r\n";
-                body += "Content-Type: "+ file.type +"\r\n\r\n";
+                var filename = field[1].name || field[1].fileName;
+				var filetype = file.type || 'application/octet-stream';
+				body += "Content-Disposition: form-data; name=\""+ field[0] +"\"; filename=\""+ filename +"\"\r\n";
+                body += "Content-Type: "+ filetype +"\r\n\r\n";
                 body += file.getAsBinary() + "\r\n";
             } else {
                 body += "Content-Disposition: form-data; name=\""+ field[0] +"\";\r\n\r\n";
